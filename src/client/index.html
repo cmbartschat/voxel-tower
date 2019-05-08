@@ -7,8 +7,9 @@
     <script src="//cdnjs.cloudflare.com/ajax/libs/three.js/93/three.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/16.3.5/Tween.min.js" crossorigin="anonymous"></script>
     <script src="orbit-controls.js"></script>
-    <script src="/socket.io/socket.io.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" crossorigin="anonymous"></script></script>
     <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:700" rel="stylesheet" crossorigin="anonymous">
+    <script src="//cdn.8thwall.com/web/share/embed8.js"></script>
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
@@ -22,9 +23,13 @@
       <p class="description">augmenting reality at <a class="link-8th-wall" href="https://8thwall.com">8th&nbsp;Wall</a></p>
     </main>
 
-    <aside>
+    <aside id="info">
       Tower height: <span id="towerHeight">...</span>
-      <a href="https://github.com/cmbartschat/voxel-tower">Source</a>
+      <a href="https://github.com/cmbartschat/voxel-tower">Source</a><br>
+    </aside>
+
+    <aside id="ar">
+      <a data-8code="8wt3n" data-icon-color="gray"></a>
     </aside>
 
     <footer>

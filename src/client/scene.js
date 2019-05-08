@@ -25,6 +25,9 @@ const fragmentShader = `
 
 var camera, controls, scene, renderer
 let renderNextFrame = false
+const urlParams = new URLSearchParams(window.location.search)
+const augmentParam = urlParams.get('augment')
+const augment = augmentParam !== null && augmentParam !== 'false'
 
 // Config
 const useOrthographic = true
@@ -45,39 +48,110 @@ const zShadeFocus = -0.12
 const yShadeFocus = 0.04
 
 let maxHeight = 0
-const focusHeightDrop = 5
+const focusHeightDrop = augment ? 10 : 5
 let focusHeight = maxHeight - focusHeightDrop
 
-const doPortal = false
+const doPortal = augment
 
-init()
-animate()
+if (augment) {
+  document.getElementById('ar').style.display = 'none'
 
-function init() {
+  window.addEventListener('xrandextrasloaded', () => {
+    XR.addCameraPipelineModules([
+      XR.GlTextureRenderer.pipelineModule(),
+      XR.Threejs.pipelineModule(),
+      XR.XrController.pipelineModule(),
+      XRExtras.FullWindowCanvas.pipelineModule(),
+    ])
+
+    XR.addCameraPipelineModule({
+      name: 'voxel-tower',
+      onStart: ({ canvasWidth, canvasHeight }) => {
+        const {scene, camera, renderer} = XR.Threejs.xrScene()
+
+        init(scene, camera, renderer)
+
+        XR.XrController.updateCameraProjectionMatrix({
+          origin: camera.position,
+          facing: camera.quaternion,
+        })
+      },
+      onUpdate: () => {
+        TWEEN.update()
+      },
+      onException: () => {
+        window.location = window.location.href.slice(0, window.location.href.length - window.location.search.length)
+      }
+    })
+
+    const canvas = document.createElement('canvas')
+    document.body.appendChild(canvas)
+
+    XR.run({canvas})
+  })
+
+  const xrScript = document.createElement('script')
+  xrScript.src = 'https://apps.8thwall.com/xrweb?appKey=29DhVorNmFQDSoVeUEkgNkLAd4bltTIAlBDHrpNTWBXTJS5HPyZQWFUd6nfGqq3PhROcEn'
+  document.head.appendChild(xrScript)
+
+  const extrasScript = document.createElement('script')
+  extrasScript.src = 'https://cdn.8thwall.com/web/xrextras/xrextras.js'
+  document.head.appendChild(extrasScript)
+
+} else {
+  init()
+  animate()
+}
+
+function init(inputScene, inputCamera, inputRenderer) {
 
   const socket = io()
 
-  scene = new THREE.Scene()
+  if (inputScene) {
+    scene = inputScene
+  } else {
+    scene = new THREE.Scene()
+  }
 
-  var material = new THREE.ShaderMaterial({
+  const cubeMaterial = new THREE.ShaderMaterial({
     uniforms: {
       baseShade: { value: baseShade },
       zShade: { value: zShade },
-      yShade: { value: yShade },
+      yShade: { value: augment ? yShadeFocus : yShade },
     },
     vertexShader, fragmentShader
   })
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setPixelRatio(window.devicePixelRatio)
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  document.body.appendChild(renderer.domElement)
+  if (inputCamera) {
+    camera = inputCamera
+    camera.position.y = 14
+    camera.position.z = 6
+  } else {
+    if (useOrthographic) {
+      var aspect = window.innerWidth / window.innerHeight
+      camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 1, 1000)
+      camera.position.set(orthoDistance, orthoDistance + focusHeight, orthoDistance)
+    } else {
+      var fov = baseFov / persDistance
+      camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 1, 1000)
+      camera.position.set(persDistance, persDistance, persDistance)
+    }
+    window.addEventListener('resize', onWindowResize, false)
+  }
 
-  const mainDuplicate = document.getElementsByTagName('main')[0].cloneNode(true)
-  mainDuplicate.setAttribute('aria-hidden', 'true')
-  mainDuplicate.classList.add('duplicate')
-  document.body.appendChild(mainDuplicate)
+  if (inputRenderer) {
+    renderer = inputRenderer
+  } else {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    document.body.appendChild(renderer.domElement)
 
+    const mainDuplicate = document.getElementsByTagName('main')[0].cloneNode(true)
+    mainDuplicate.setAttribute('aria-hidden', 'true')
+    mainDuplicate.classList.add('duplicate')
+    document.body.appendChild(mainDuplicate)
+  }
 
   let cubes = []
   let dimension = 0
@@ -91,8 +165,7 @@ function init() {
   let interactionStartY
 
   let isFocused = false
-  let backgroundChangeTween = null
-  // let exitFocusTimeout = null
+  let focusChangeTween
 
   let hideDuplicateTimeout
 
@@ -105,10 +178,10 @@ function init() {
     clearTimeout(hideDuplicateTimeout)
     document.body.classList.add('focus')
     document.body.classList.add('show-duplicate')
-    if (backgroundChangeTween) {
-      backgroundChangeTween.stop()
+    if (focusChangeTween) {
+      focusChangeTween.stop()
     }
-    backgroundChangeTween = new TWEEN.Tween(material.uniforms.yShade)
+    focusChangeTween = new TWEEN.Tween(cubeMaterial.uniforms.yShade)
       .to({ value: yShadeFocus }, 1000)
       .easing(TWEEN.Easing.Quadratic.Out)
       .onUpdate(function() {
@@ -125,18 +198,17 @@ function init() {
     }
     isFocused = false
 
-    clearTimeout(hideDuplicateTimeout)
     document.body.classList.remove('focus')
-    //scene.background.set(backgroundColor
 
+    clearTimeout(hideDuplicateTimeout)
     hideDuplicateTimeout = setTimeout(() => {
       document.body.classList.remove('show-duplicate')
     }, 500)
 
-    if (backgroundChangeTween) {
-      backgroundChangeTween.stop()
+    if (focusChangeTween) {
+      focusChangeTween.stop()
     }
-    backgroundChangeTween = new TWEEN.Tween(material.uniforms.yShade)
+    focusChangeTween = new TWEEN.Tween(cubeMaterial.uniforms.yShade)
       .to({ value: yShade }, 1000)
       .easing(TWEEN.Easing.Quadratic.Out)
       .onUpdate(function() {
@@ -146,7 +218,11 @@ function init() {
     renderNextFrame = true
   }
 
-  const handleInteractionStart = ({ clientX, clientY, changedTouches }) => {
+  const handleInteractionStart = ({ clientX, clientY, changedTouches, touches }) => {
+    if (augment && touches && touches.length > 1) {
+      XR.XrController.recenter()
+      return
+    }
     hasInteraction = true
     interactionStartTime = performance.now()
     interactionStartX = clientX || changedTouches[0].clientX
@@ -216,35 +292,27 @@ function init() {
   renderer.domElement.addEventListener('touchstart', handleInteractionStart)
   renderer.domElement.addEventListener('touchend', handleInteractionEnd)
 
-  if (useOrthographic) {
-    var aspect = window.innerWidth / window.innerHeight
-    camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 1, 1000)
-    camera.position.set(orthoDistance, orthoDistance + focusHeight, orthoDistance)
-  } else {
-    var fov = baseFov / persDistance
-    camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 1, 1000)
-    camera.position.set(persDistance, persDistance, persDistance)
+  if (!augment) {
+    // Initialize orbit controls
+    controls = new THREE.OrbitControls(camera, renderer.domElement)
+
+    controls.enableDamping = true
+    controls.dampingFactor = 0.25
+    controls.target.set(0, 0, 0)
+
+    controls.screenSpacePanning = true
+    controls.enablePan = false
+    controls.enableZoom = false
+    controls.rotateSpeed = 0.15
+
+    controls.minPolarAngle = 0.2
+    controls.maxPolarAngle = Math.PI / 2 - 0.2
+    controls.update()
   }
 
-  // Initialize orbit controls
-  controls = new THREE.OrbitControls(camera, renderer.domElement)
-
-  controls.enableDamping = true
-  controls.dampingFactor = 0.25
-  controls.target.set(0, 0, 0)
-
-  controls.screenSpacePanning = true
-  controls.enablePan = false
-  controls.enableZoom = false
-  controls.rotateSpeed = 0.15
-
-  controls.minPolarAngle = 0.2
-  controls.maxPolarAngle = Math.PI / 2 - 0.2
-  controls.update()
-
   let heightChangeTween
-  const updateMaxHeight = height => {
-    if (height <= maxHeight) {
+  const updateMaxHeight = (height, force) => {
+    if (height <= maxHeight && !force) {
       return
     }
 
@@ -252,7 +320,7 @@ function init() {
 
     document.getElementById('towerHeight').textContent = maxHeight
 
-    if (maxHeight - focusHeightDrop > focusHeight) {
+    if (maxHeight - focusHeightDrop > focusHeight || force) {
       heightChangeTween && heightChangeTween.stop()
 
       focusHeight = maxHeight - focusHeightDrop
@@ -282,34 +350,36 @@ function init() {
   }
 
   const createVoxel = (x, y, z) => {
-    return cubes.push(createBox(x, y, z, cubeScale, cubeScale, cubeScale, material, cubeBasis))
+    return cubes.push(createBox(x, y, z, cubeScale, cubeScale, cubeScale, cubeMaterial, cubeBasis))
   }
 
+  let wall, holePlane
   if (doPortal) {
-
-    const portalWidth = 4
-
     const wallMaterial = new THREE.MeshBasicMaterial({
       color: 0xd0d0d0,
-      side: THREE.DoubleSide,
+      side: THREE.BackSide,
     })
 
-    const ringGeometry = new THREE.CylinderBufferGeometry(1, 1, 1, 4, 1, true, Math.PI / 4)
-    const hider = new THREE.Mesh(ringGeometry, wallMaterial)
-    hider.position.y = -1000
-    hider.scale.set(portalWidth, -2 * hider.position.y, portalWidth)
-    scene.add(hider)
+    const wallGeometry = new THREE.CylinderBufferGeometry(0.5, 1, 1, 4, 1, true, Math.PI / 4)
+    wall = new THREE.Mesh(wallGeometry, wallMaterial)
+    wall.visible = false
+    wall.scale.set(1, 2000, 1)
+    wall.position.y = -1000
+    scene.add(wall)
 
-     const hiderMaterial = new THREE.MeshBasicMaterial({
+    const holeMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0000,
       side: THREE.DoubleSide,
-       colorWrite: false,
+      colorWrite: false,
     })
 
-
-    const holePlaneGeometry = new THREE.CylinderBufferGeometry(portalWidth, 1000, 1, 4, 1, true, Math.PI / 4)
-    const holePlane = new THREE.Mesh(holePlaneGeometry, hiderMaterial)
-    holePlane.position.y = -0.5
+    const holePlaneGeometry = new THREE.RingBufferGeometry(0.5, 1000, 4, 1)
+    holePlane = new THREE.Mesh(holePlaneGeometry, holeMaterial)
+    holePlane.visible = false
+    holePlane.rotation.order = 'XZY'
+    holePlane.rotation.x = Math.PI / 2
+    holePlane.rotation.z = Math.PI / 4
+    holePlane.scale.set(0.001, 0.001, 0.001)
     holePlane.renderOrder = -1
     scene.add(holePlane)
   }
@@ -339,21 +409,48 @@ function init() {
 
     const starterBoxLength = 2000 + minHeight
     const starterBoxHeight = minHeight - 0.5 - starterBoxLength / 2
-    createBox(0, starterBoxHeight, 0, dimension, starterBoxLength, dimension, material, cubeBasis)
+    createBox(0, starterBoxHeight, 0, dimension, starterBoxLength, dimension, cubeMaterial, cubeBasis)
 
-    cubeBasis.position.y = -minHeight
+    cubeBasis.position.y = doPortal ? -maxHeight - 100 : -minHeight
 
-    updateMaxHeight(maxHeight)
+    if (doPortal) {
+      const portalWidth = 2 + dimension
+
+      cubeBasis.visible = false
+      wall.visible = true
+      holePlane.visible = true
+
+      const portalDiagonal = portalWidth * Math.sqrt(2)
+
+      wall.scale.x = portalDiagonal
+      wall.scale.z = portalDiagonal
+
+
+      setTimeout(() => {
+        const holeOpenTween = new TWEEN.Tween(holePlane.scale)
+          .to({ x: portalDiagonal, y: portalDiagonal, z: portalDiagonal }, 1000)
+          .easing(TWEEN.Easing.Quadratic.Out)
+          .onUpdate(function() {
+            renderNextFrame = true
+          })
+          .onComplete(() => {
+            cubeBasis.visible = true
+            updateMaxHeight(maxHeight, true)
+          })
+          .start()
+      })
+    } else {
+      updateMaxHeight(maxHeight, true)
+    }
+
     renderNextFrame = true
-  })
+  }, 1000)
 
   socket.on('newblock', data => {
     createVoxel(data.x, data.y, data.z)
     updateMaxHeight(data.y)
     renderNextFrame = true
   })
-
-  window.addEventListener('resize', onWindowResize, false)
 }
 
 function onWindowResize() {

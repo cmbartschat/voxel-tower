@@ -113,19 +113,28 @@ canvas {
   top: 0;
   z-index: -1;
   transition: 1s opacity;
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
 
 aside {
   position: absolute;
+  font-size: 0.7rem;
+  color: #0004;
+  transition: 1s color;
+}
+
+#info {
   top: 1em;
   right: 1em;
-  opacity: 0.4;
-  font-size: 0.7rem;
-  transition: 1s opacity;
+}
+
+#ar {
+  left: 1em;
+  bottom: 1em;
 }
 
 .focus aside {
-  opacity: 0.8;
+  color: #0008;
 }
 
 footer {
@@ -134,4 +143,14 @@ footer {
   right: 1em;
   opacity: 0.4;
   font-size: 0.7rem;
+}
+
+.embed8-pop-over {
+  left: 50%;
+  transform: translate(-35px, -1em);
+  border-radius: 0;
+}
+
+.embed8-pop-over:after {
+  left: 35px;
 }
