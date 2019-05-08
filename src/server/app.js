@@ -73,6 +73,20 @@ io.on('connection', function (socket) {
   })
 })
 
+if (process.env.production) {
+  console.log('using production https redirect')
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      res.redirect(`https://${req.header('host')}${req.url}`)
+    }
+    else {
+      next()
+    }
+  })
+} else {
+  console.log('not using production https redirect')
+}
+
 app.use(express.static('dist'))
 
 app.get('/tower.json', (req, res) => {
