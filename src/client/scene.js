@@ -353,19 +353,27 @@ function init(inputScene, inputCamera, inputRenderer) {
     return cubes.push(createBox(x, y, z, cubeScale, cubeScale, cubeScale, cubeMaterial, cubeBasis))
   }
 
-  let wall, holePlane
+  let wall, holePlane, bottom
+  const portalDepth = 800
   if (doPortal) {
     const wallMaterial = new THREE.MeshBasicMaterial({
       color: 0xd0d0d0,
       side: THREE.BackSide,
     })
 
-    const wallGeometry = new THREE.CylinderBufferGeometry(0.5, 1, 1, 4, 1, true, Math.PI / 4)
+    const wallGeometry = new THREE.CylinderBufferGeometry(Math.sqrt(0.5), Math.sqrt(0.5), 1, 4, 1, true, Math.PI / 4)
     wall = new THREE.Mesh(wallGeometry, wallMaterial)
     wall.visible = false
-    wall.scale.set(1, 2000, 1)
-    wall.position.y = -1000
+    wall.scale.set(1, portalDepth, 1)
+    wall.position.y = portalDepth / -2
     scene.add(wall)
+
+    const bottomGeometry = new THREE.PlaneBufferGeometry()
+    bottom = new THREE.Mesh(bottomGeometry, wallMaterial)
+    bottom.visible = false
+    bottom.rotation.x = Math.PI / 2
+    bottom.position.y = -portalDepth
+    scene.add(bottom)
 
     const holeMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0000,
@@ -373,11 +381,11 @@ function init(inputScene, inputCamera, inputRenderer) {
       colorWrite: false,
     })
 
-    const holePlaneGeometry = new THREE.RingBufferGeometry(0.5, 1000, 4, 1)
+    const holePlaneGeometry = new THREE.RingBufferGeometry(Math.sqrt(0.5), 1000, 4, 1)
     holePlane = new THREE.Mesh(holePlaneGeometry, holeMaterial)
     holePlane.visible = false
     holePlane.rotation.order = 'XZY'
-    holePlane.rotation.x = Math.PI / 2
+    holePlane.rotation.x = -Math.PI / 2
     holePlane.rotation.z = Math.PI / 4
     holePlane.scale.set(0.001, 0.001, 0.001)
     holePlane.renderOrder = -1
@@ -407,28 +415,27 @@ function init(inputScene, inputCamera, inputRenderer) {
       }
     }
 
-    const starterBoxLength = 2000 + minHeight
+    const starterBoxLength = portalDepth + minHeight
     const starterBoxHeight = minHeight - 0.5 - starterBoxLength / 2
     createBox(0, starterBoxHeight, 0, dimension, starterBoxLength, dimension, cubeMaterial, cubeBasis)
 
     cubeBasis.position.y = doPortal ? -maxHeight - 100 : -minHeight
 
     if (doPortal) {
-      const portalWidth = 2 + dimension
 
       cubeBasis.visible = false
       wall.visible = true
+      bottom.visible = true
       holePlane.visible = true
 
-      const portalDiagonal = portalWidth * Math.sqrt(2)
-
-      wall.scale.x = portalDiagonal
-      wall.scale.z = portalDiagonal
-
+      const portalWidth = 2 + dimension
+      wall.scale.x = portalWidth
+      wall.scale.z = portalWidth
+      bottom.scale.set(portalWidth, portalWidth, portalWidth)
 
       setTimeout(() => {
         const holeOpenTween = new TWEEN.Tween(holePlane.scale)
-          .to({ x: portalDiagonal, y: portalDiagonal, z: portalDiagonal }, 1000)
+          .to({ x: portalWidth, y: portalWidth, z: portalWidth }, 1000)
           .easing(TWEEN.Easing.Quadratic.Out)
           .onUpdate(function() {
             renderNextFrame = true
