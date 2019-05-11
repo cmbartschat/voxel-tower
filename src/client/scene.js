@@ -218,7 +218,11 @@ function init(inputScene, inputCamera, inputRenderer) {
     renderNextFrame = true
   }
 
-  const handleInteractionStart = ({ clientX, clientY, changedTouches, touches }) => {
+  const handleInteractionStart = e => {
+
+    e.preventDefault()
+
+    const { clientX, clientY, changedTouches, touches } = e
     if (augment && touches && touches.length > 1) {
       XR.XrController.recenter()
       return
