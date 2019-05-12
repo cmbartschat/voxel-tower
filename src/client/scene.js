@@ -53,8 +53,24 @@ let focusHeight = maxHeight - focusHeightDrop
 
 const doPortal = augment
 
+const redirectWithMessage = (message, redirectType) => {
+  message && alert(message)
+
+  if (redirectType === 'reload') {
+    window.location.reload()
+  } else {
+    window.location = window.location.href.slice(0, window.location.href.length - window.location.search.length)
+  }
+}
+
 if (augment) {
 
+  let hasMotion = false
+  const handleMotion = () => {
+    hasMotion = true
+    window.removeEventListener('devicemotion', handleMotion)
+  }
+  window.addEventListener('devicemotion', handleMotion)
 
   window.addEventListener('xrandextrasloaded', () => {
     XR.addCameraPipelineModules([
@@ -67,6 +83,13 @@ if (augment) {
     XR.addCameraPipelineModule({
       name: 'voxel-tower',
       onStart: ({ canvasWidth, canvasHeight }) => {
+
+        if (!hasMotion) {
+          redirectWithMessage('Your browser has motion sensors disabled.\nPlease enable it at Settings > Safari > Privacy & Security > Motion & Orientation Access.', 'reload')
+          XR.pause()
+          return
+        }
+
         document.body.classList.add('augment')
 
         const {scene, camera, renderer} = XR.Threejs.xrScene()
@@ -81,8 +104,31 @@ if (augment) {
       onUpdate: () => {
         TWEEN.update()
       },
+      onCameraStatusChange: e => {
+        if (e.status === 'failed') {
+          redirectWithMessage('Please accept camera permissions.', 'reload')
+        }
+      },
       onException: () => {
-        window.location = window.location.href.slice(0, window.location.href.length - window.location.search.length)
+
+        const compatibility = XR.XrDevice.compatibilities()
+        const reasons = XR.XrDevice.incompatibleReasons()
+        const device = XR.XrDevice.deviceEstimate()
+
+        if (reasons.length == 0) {
+          redirectWithMessage(null, 'reload')
+        } else if (device.os ==='iOS') {
+          if (!compatibility.hasBrowser || !compatibility.hasUserMedia) {
+            redirectWithMessage('Please switch to Safari to use AR.')
+          } else {
+            redirectWithMessage('Error starting AR.\nYou may need to update iOS to use AR.')
+          }
+        } else if (device.os === 'Android') {
+          redirectWithMessage('Error starting AR.\nYou may need to update your browser or use a different one.')
+        } else {
+          // Desktop
+          return redirectWithMessage()
+        }
       }
     })
 
