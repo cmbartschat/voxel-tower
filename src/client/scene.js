@@ -54,7 +54,7 @@ let focusHeight = maxHeight - focusHeightDrop
 const doPortal = augment
 
 if (augment) {
-  document.getElementById('ar').style.display = 'none'
+
 
   window.addEventListener('xrandextrasloaded', () => {
     XR.addCameraPipelineModules([
@@ -67,6 +67,8 @@ if (augment) {
     XR.addCameraPipelineModule({
       name: 'voxel-tower',
       onStart: ({ canvasWidth, canvasHeight }) => {
+        document.body.classList.add('augment')
+
         const {scene, camera, renderer} = XR.Threejs.xrScene()
 
         init(scene, camera, renderer)
