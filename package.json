@@ -5,7 +5,7 @@
     "build": "rm -rf dist && cp -r src/client/ dist/",
     "start": "node src/server/app.js",
     "serve": "npm run build && npm run start",
-    "deploy": "npm run build && gcloud app deploy"
+    "deploy": "npm run build && gcloud app deploy --project  wide-plating-239720"
   },
   "dependencies": {
     "@google-cloud/datastore": "^3.1.2",
